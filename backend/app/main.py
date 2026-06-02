@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI
 from pydantic import BaseModel
 import re
@@ -13,7 +13,7 @@ app = FastAPI(
 
 # crées une classe appelée LogInput. Elle hérite de BaseModel
 # contenir trois champs de type str
-# source: str --> indique d’où vient le log "firewall server endpoint ids nginx windows"
+# source: str --> indique d’où vient le log "firewall server endpoint ids nginx x"
 # log_type: str --> indique le type de log "info warning error alert authentication network"
 # le contenu réel du log --> Exemple : Failed login attempt for user admin
 class LogInput(BaseModel):
@@ -86,19 +86,27 @@ def detect_brute_force():
     Détection simple :
     si une IP a 5 échecs SSH ou plus, créer une alerte.
     """
+
+    now = datetime.utcnow()
+    time_window_start = now - timedelta(minutes=10)
+
     # dic (map)
     failed_login_count_by_ip = {}
 
     for log in logs_storage:
         parsed = log.get("parsed", {})
 
-        if (
+        received_at = datetime.fromisoformat(log["received_at"])
+        is_recent = received_at >= time_window_start
+
+        is_failed_login = (
                 parsed.get("category") == "authentication"
                 and parsed.get("action") == "login_failed"
                 and parsed.get("source_ip") is not None
-        ):
+        )
+
+        if is_recent and is_failed_login:
             source_ip = parsed["source_ip"]
-            # compter
             failed_login_count_by_ip[source_ip] = failed_login_count_by_ip.get(source_ip, 0) + 1
 
     for source_ip, count in failed_login_count_by_ip.items():
@@ -119,6 +127,7 @@ def detect_brute_force():
                     "severity": "high",
                     "source_ip": source_ip,
                     "failed_attempts": count,
+                    "time_window_minutes": 10,
                     "status": "open",
                     "created_at": datetime.utcnow().isoformat()
                 }
