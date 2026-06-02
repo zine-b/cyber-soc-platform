@@ -24,10 +24,9 @@ class LogInput(BaseModel):
 
 # crée une liste vide
 logs_storage = []
-
+alerts_storage = []
 
 # transformer les logs bruts en événements structurés.
-#
 def parse_linux_auth_log(message: str):
     """
     Parser simple pour les logs SSH Linux.
@@ -82,11 +81,58 @@ def home():
     }
 
 
+def detect_brute_force():
+    """
+    Détection simple :
+    si une IP a 5 échecs SSH ou plus, créer une alerte.
+    """
+    # dic (map)
+    failed_login_count_by_ip = {}
+
+    for log in logs_storage:
+        parsed = log.get("parsed", {})
+
+        if (
+                parsed.get("category") == "authentication"
+                and parsed.get("action") == "login_failed"
+                and parsed.get("source_ip") is not None
+        ):
+            source_ip = parsed["source_ip"]
+            # compter
+            failed_login_count_by_ip[source_ip] = failed_login_count_by_ip.get(source_ip, 0) + 1
+
+    for source_ip, count in failed_login_count_by_ip.items():
+        if count >= 5:
+            alert_already_exists = any(
+                alert["source_ip"] == source_ip
+                and alert["rule_id"] == "SSH_BRUTE_FORCE"
+                and alert["status"] == "open"
+                for alert in alerts_storage
+            )
+
+            if not alert_already_exists:
+                alert = {
+                    "id": len(alerts_storage) + 1,
+                    "rule_id": "SSH_BRUTE_FORCE",
+                    "title": "Possible SSH brute force attack",
+                    "description": f"{count} failed SSH login attempts from {source_ip}",
+                    "severity": "high",
+                    "source_ip": source_ip,
+                    "failed_attempts": count,
+                    "status": "open",
+                    "created_at": datetime.utcnow().isoformat()
+                }
+
+                alerts_storage.append(alert)
+
+
 @app.post("/ingest/log")
 def ingest_log(log: LogInput):
     parsed_data = {}
+
     if log.log_type == "linux_auth":
         parsed_data = parse_linux_auth_log(log.message)
+
     log_entry = {
         "id": len(logs_storage) + 1,
         "source": log.source,
@@ -97,10 +143,13 @@ def ingest_log(log: LogInput):
     }
 
     logs_storage.append(log_entry)
+    
+    detect_brute_force()
+
 
     return {
         "status": "success",
-        "message": "Log received successfully",
+        "message": "Log received and parsed and analyzed successfully",
         "data": log_entry
     }
 
@@ -110,4 +159,11 @@ def get_logs():
     return {
         "count": len(logs_storage),
         "logs": logs_storage
+    }
+
+@app.get("/alerts")
+def get_alerts():
+    return {
+        "count": len(alerts_storage),
+        "alerts": alerts_storage
     }
