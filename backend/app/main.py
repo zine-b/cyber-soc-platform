@@ -3,7 +3,7 @@ from fastapi import FastAPI
 
 from app.database import Base, engine, get_db
 from app.models import LogModel, AlertModel
-from app.schemas import LogInput
+from app.schemas import LogInput, AlertStatusUpdate
 from app.parsers import parse_linux_auth_log
 from app.detection import detect_brute_force
 
@@ -117,6 +117,74 @@ def get_alerts():
     response = {
         "count": len(alerts),
         "alerts": [alert_to_dict(alert) for alert in alerts]
+    }
+
+    db.close()
+
+    return response
+
+
+@app.get("/alerts/{alert_id}")
+def get_alert_by_id(alert_id: int):
+    db = get_db()
+
+    alert = (
+        db.query(AlertModel)
+        .filter(AlertModel.id == alert_id)
+        .first()
+    )
+
+    if alert is None:
+        db.close()
+        return {
+            "status": "error",
+            "message": "Alert not found"
+        }
+
+    response = {
+        "status": "success",
+        "alert": alert_to_dict(alert)
+    }
+
+    db.close()
+
+    return response
+
+
+@app.patch("/alerts/{alert_id}/status")
+def update_alert_status(alert_id: int, status_update: AlertStatusUpdate):
+    db = get_db()
+
+    allowed_statuses = ["open", "investigating", "resolved", "false_positive"]
+
+    if status_update.status not in allowed_statuses:
+        db.close()
+        return {
+            "status": "error",
+            "message": f"Invalid status. Allowed values: {allowed_statuses}"
+        }
+
+    alert = (
+        db.query(AlertModel)
+        .filter(AlertModel.id == alert_id)
+        .first()
+    )
+
+    if alert is None:
+        db.close()
+        return {
+            "status": "error",
+            "message": "Alert not found"
+        }
+
+    alert.status = status_update.status
+    db.commit()
+    db.refresh(alert)
+
+    response = {
+        "status": "success",
+        "message": "Alert status updated successfully",
+        "alert": alert_to_dict(alert)
     }
 
     db.close()
