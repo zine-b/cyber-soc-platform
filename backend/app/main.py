@@ -2,8 +2,8 @@ from datetime import datetime
 from fastapi import FastAPI
 
 from app.database import Base, engine, get_db
-from app.models import LogModel, AlertModel
-from app.schemas import LogInput, AlertStatusUpdate
+from app.models import LogModel, AlertModel, IncidentModel
+from app.schemas import LogInput, AlertStatusUpdate, IncidentCreate, IncidentStatusUpdate
 from app.parsers import parse_linux_auth_log
 from app.detection import detect_brute_force
 
@@ -42,6 +42,15 @@ def alert_to_dict(alert: AlertModel):
         "created_at": alert.created_at.isoformat()
     }
 
+def incident_to_dict(incident: IncidentModel):
+    return {
+        "id": incident.id,
+        "title": incident.title,
+        "description": incident.description,
+        "severity": incident.severity,
+        "status": incident.status,
+        "created_at": incident.created_at.isoformat()
+    }
 
 @app.get("/")
 def home():
@@ -83,7 +92,6 @@ def ingest_log(log: LogInput):
 
     return response
 
-
 @app.get("/logs")
 def get_logs():
     db = get_db()
@@ -103,7 +111,6 @@ def get_logs():
 
     return response
 
-
 @app.get("/alerts")
 def get_alerts():
     db = get_db()
@@ -122,7 +129,6 @@ def get_alerts():
     db.close()
 
     return response
-
 
 @app.get("/alerts/{alert_id}")
 def get_alert_by_id(alert_id: int):
@@ -149,7 +155,6 @@ def get_alert_by_id(alert_id: int):
     db.close()
 
     return response
-
 
 @app.patch("/alerts/{alert_id}/status")
 def update_alert_status(alert_id: int, status_update: AlertStatusUpdate):
@@ -185,6 +190,126 @@ def update_alert_status(alert_id: int, status_update: AlertStatusUpdate):
         "status": "success",
         "message": "Alert status updated successfully",
         "alert": alert_to_dict(alert)
+    }
+
+    db.close()
+
+    return response
+
+@app.post("/incidents")
+def create_incident(incident: IncidentCreate):
+    db = get_db()
+
+    allowed_severities = ["low", "medium", "high", "critical"]
+
+    if incident.severity not in allowed_severities:
+        db.close()
+        return {
+            "status": "error",
+            "message": f"Invalid severity. Allowed values: {allowed_severities}"
+        }
+
+    new_incident = IncidentModel(
+        title=incident.title,
+        description=incident.description,
+        severity=incident.severity,
+        status="open",
+        created_at=datetime.utcnow()
+    )
+
+    db.add(new_incident)
+    db.commit()
+    db.refresh(new_incident)
+
+    response = {
+        "status": "success",
+        "message": "Incident created successfully",
+        "incident": incident_to_dict(new_incident)
+    }
+
+    db.close()
+
+    return response
+
+@app.get("/incidents")
+def get_incidents():
+    db = get_db()
+
+    incidents = (
+        db.query(IncidentModel)
+        .order_by(IncidentModel.id.desc())
+        .all()
+    )
+
+    response = {
+        "count": len(incidents),
+        "incidents": [incident_to_dict(incident) for incident in incidents]
+    }
+
+    db.close()
+
+    return response
+
+@app.get("/incidents/{incident_id}")
+def get_incident_by_id(incident_id: int):
+    db = get_db()
+
+    incident = (
+        db.query(IncidentModel)
+        .filter(IncidentModel.id == incident_id)
+        .first()
+    )
+
+    if incident is None:
+        db.close()
+        return {
+            "status": "error",
+            "message": "Incident not found"
+        }
+
+    response = {
+        "status": "success",
+        "incident": incident_to_dict(incident)
+    }
+
+    db.close()
+
+    return response
+
+@app.patch("/incidents/{incident_id}/status")
+def update_incident_status(incident_id: int, status_update: IncidentStatusUpdate):
+    db = get_db()
+
+    allowed_statuses = ["open", "investigating", "resolved", "false_positive"]
+
+    if status_update.status not in allowed_statuses:
+        db.close()
+        return {
+            "status": "error",
+            "message": f"Invalid status. Allowed values: {allowed_statuses}"
+        }
+
+    incident = (
+        db.query(IncidentModel)
+        .filter(IncidentModel.id == incident_id)
+        .first()
+    )
+
+    if incident is None:
+        db.close()
+        return {
+            "status": "error",
+            "message": "Incident not found"
+        }
+
+    incident.status = status_update.status
+    db.commit()
+    db.refresh(incident)
+
+    response = {
+        "status": "success",
+        "message": "Incident status updated successfully",
+        "incident": incident_to_dict(incident)
     }
 
     db.close()

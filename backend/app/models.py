@@ -28,3 +28,14 @@ class AlertModel(Base):
     time_window_minutes = Column(Integer)
     status = Column(String)
     created_at = Column(DateTime)
+
+
+class IncidentModel(Base):
+    __tablename__ = "incidents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    description = Column(String)
+    severity = Column(String)
+    status = Column(String)
+    created_at = Column(DateTime)
