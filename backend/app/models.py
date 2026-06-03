@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, JSON
-from app.database import Base
+from .database import Base
 
 # -------------------------
 # Database models
@@ -39,4 +39,5 @@ class IncidentModel(Base):
     description = Column(String)
     severity = Column(String)
     status = Column(String)
+    assigned_to = Column(String, nullable=True)
     created_at = Column(DateTime)

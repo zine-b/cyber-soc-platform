@@ -1,17 +1,21 @@
 from datetime import datetime
 from fastapi import FastAPI
 
-from app.database import Base, engine, get_db
-from app.models import LogModel, AlertModel, IncidentModel
-from app.schemas import (
+from .database import Base, engine, get_db
+from .models import LogModel, AlertModel, IncidentModel
+from .schemas import (
     LogInput,
     AlertStatusUpdate,
     AlertAssignIncident,
     IncidentCreate,
-    IncidentStatusUpdate
+    IncidentStatusUpdate,
+    IncidentAssign,
+    LogResponse,
+    AlertResponse,
+    IncidentResponse
 )
-from app.parsers import parse_linux_auth_log
-from app.detection import detect_brute_force
+from .parsers import parse_linux_auth_log
+from .detection import detect_brute_force
 
 
 app = FastAPI(
@@ -23,55 +27,7 @@ app = FastAPI(
 Base.metadata.create_all(bind=engine)
 
 
-def log_to_dict(log: LogModel):
-    return {
-        "id": log.id,
-        "source": log.source,
-        "log_type": log.log_type,
-        "message": log.message,
-        "parsed": log.parsed,
-        "received_at": log.received_at.isoformat()
-    }
 
-
-def alert_to_dict(alert: AlertModel):
-    return {
-        "id": alert.id,
-        "rule_id": alert.rule_id,
-        "title": alert.title,
-        "description": alert.description,
-        "severity": alert.severity,
-        "source_ip": alert.source_ip,
-        "failed_attempts": alert.failed_attempts,
-        "time_window_minutes": alert.time_window_minutes,
-        "status": alert.status,
-        "created_at": alert.created_at.isoformat()
-    }
-
-def incident_to_dict(incident: IncidentModel):
-    return {
-        "id": incident.id,
-        "title": incident.title,
-        "description": incident.description,
-        "severity": incident.severity,
-        "status": incident.status,
-        "created_at": incident.created_at.isoformat()
-    }
-
-def alert_to_dict(alert: AlertModel):
-    return {
-        "id": alert.id,
-        "rule_id": alert.rule_id,
-        "title": alert.title,
-        "description": alert.description,
-        "severity": alert.severity,
-        "source_ip": alert.source_ip,
-        "failed_attempts": alert.failed_attempts,
-        "time_window_minutes": alert.time_window_minutes,
-        "status": alert.status,
-        "incident_id": alert.incident_id,
-        "created_at": alert.created_at.isoformat()
-    }
 @app.get("/")
 def home():
     return {
@@ -105,7 +61,7 @@ def ingest_log(log: LogInput):
     response = {
         "status": "success",
         "message": "Log received, parsed, analyzed and saved successfully",
-        "data": log_to_dict(log_entry)
+        "data": LogResponse.model_validate(log_entry)
     }
 
     db.close()
@@ -124,7 +80,7 @@ def get_logs():
 
     response = {
         "count": len(logs),
-        "logs": [log_to_dict(log) for log in logs]
+        "logs": [LogResponse.model_validate(log) for log in logs]
     }
 
     db.close()
@@ -143,7 +99,7 @@ def get_alerts():
 
     response = {
         "count": len(alerts),
-        "alerts": [alert_to_dict(alert) for alert in alerts]
+        "alerts": [AlertResponse.model_validate(alert) for alert in alerts]
     }
 
     db.close()
@@ -169,7 +125,7 @@ def get_alert_by_id(alert_id: int):
 
     response = {
         "status": "success",
-        "alert": alert_to_dict(alert)
+        "alert": AlertResponse.model_validate(alert)
     }
 
     db.close()
@@ -209,7 +165,7 @@ def update_alert_status(alert_id: int, status_update: AlertStatusUpdate):
     response = {
         "status": "success",
         "message": "Alert status updated successfully",
-        "alert": alert_to_dict(alert)
+        "alert": AlertResponse.model_validate(alert)
     }
 
     db.close()
@@ -234,6 +190,7 @@ def create_incident(incident: IncidentCreate):
         description=incident.description,
         severity=incident.severity,
         status="open",
+        assigned_to=None,
         created_at=datetime.utcnow()
     )
 
@@ -244,7 +201,7 @@ def create_incident(incident: IncidentCreate):
     response = {
         "status": "success",
         "message": "Incident created successfully",
-        "incident": incident_to_dict(new_incident)
+        "incident": IncidentResponse.model_validate(new_incident)
     }
 
     db.close()
@@ -263,7 +220,7 @@ def get_incidents():
 
     response = {
         "count": len(incidents),
-        "incidents": [incident_to_dict(incident) for incident in incidents]
+        "incidents": [IncidentResponse.model_validate(incident) for incident in incidents]
     }
 
     db.close()
@@ -296,9 +253,9 @@ def get_incident_by_id(incident_id: int):
 
     response = {
         "status": "success",
-        "incident": incident_to_dict(incident),
+        "incident": IncidentResponse.model_validate(incident),
         "linked_alerts_count": len(linked_alerts),
-        "linked_alerts": [alert_to_dict(alert) for alert in linked_alerts]
+        "linked_alerts": [AlertResponse.model_validate(alert) for alert in linked_alerts]
     }
 
     db.close()
@@ -338,7 +295,7 @@ def update_incident_status(incident_id: int, status_update: IncidentStatusUpdate
     response = {
         "status": "success",
         "message": "Incident status updated successfully",
-        "incident": incident_to_dict(incident)
+        "incident": IncidentResponse.model_validate(incident)
     }
 
     db.close()
@@ -382,10 +339,40 @@ def assign_alert_to_incident(alert_id: int, assign_data: AlertAssignIncident):
     response = {
         "status": "success",
         "message": "Alert assigned to incident successfully",
-        "alert": alert_to_dict(alert)
+        "alert": AlertResponse.model_validate(alert)
     }
 
     db.close()
 
     return response
 
+@app.patch("/incidents/{incident_id}/assign")
+def assign_incident(incident_id: int, assign_data: IncidentAssign):
+    db = get_db()
+
+    incident = (
+        db.query(IncidentModel)
+        .filter(IncidentModel.id == incident_id)
+        .first()
+    )
+
+    if incident is None:
+        db.close()
+        return {
+            "status": "error",
+            "message": "Incident not found"
+        }
+
+    incident.assigned_to = assign_data.assigned_to
+    db.commit()
+    db.refresh(incident)
+
+    response = {
+        "status": "success",
+        "message": "Incident assigned successfully",
+        "incident": IncidentResponse.model_validate(incident)
+    }
+
+    db.close()
+
+    return response

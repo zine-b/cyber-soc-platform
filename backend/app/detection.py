@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from app.models import LogModel, AlertModel
+from .models import LogModel, AlertModel
 
 
 def detect_brute_force(db):
