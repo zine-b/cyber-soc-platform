@@ -53,6 +53,7 @@ def detect_brute_force(db):
                     failed_attempts=count,
                     time_window_minutes=10,
                     status="open",
+                    incident_id=None,
                     created_at=datetime.utcnow()
                 )
 

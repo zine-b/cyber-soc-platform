@@ -3,7 +3,13 @@ from fastapi import FastAPI
 
 from app.database import Base, engine, get_db
 from app.models import LogModel, AlertModel, IncidentModel
-from app.schemas import LogInput, AlertStatusUpdate, IncidentCreate, IncidentStatusUpdate
+from app.schemas import (
+    LogInput,
+    AlertStatusUpdate,
+    AlertAssignIncident,
+    IncidentCreate,
+    IncidentStatusUpdate
+)
 from app.parsers import parse_linux_auth_log
 from app.detection import detect_brute_force
 
@@ -52,6 +58,20 @@ def incident_to_dict(incident: IncidentModel):
         "created_at": incident.created_at.isoformat()
     }
 
+def alert_to_dict(alert: AlertModel):
+    return {
+        "id": alert.id,
+        "rule_id": alert.rule_id,
+        "title": alert.title,
+        "description": alert.description,
+        "severity": alert.severity,
+        "source_ip": alert.source_ip,
+        "failed_attempts": alert.failed_attempts,
+        "time_window_minutes": alert.time_window_minutes,
+        "status": alert.status,
+        "incident_id": alert.incident_id,
+        "created_at": alert.created_at.isoformat()
+    }
 @app.get("/")
 def home():
     return {
@@ -267,9 +287,18 @@ def get_incident_by_id(incident_id: int):
             "message": "Incident not found"
         }
 
+    linked_alerts = (
+        db.query(AlertModel)
+        .filter(AlertModel.incident_id == incident_id)
+        .order_by(AlertModel.id.desc())
+        .all()
+    )
+
     response = {
         "status": "success",
-        "incident": incident_to_dict(incident)
+        "incident": incident_to_dict(incident),
+        "linked_alerts_count": len(linked_alerts),
+        "linked_alerts": [alert_to_dict(alert) for alert in linked_alerts]
     }
 
     db.close()
@@ -315,3 +344,48 @@ def update_incident_status(incident_id: int, status_update: IncidentStatusUpdate
     db.close()
 
     return response
+
+@app.patch("/alerts/{alert_id}/assign-incident")
+def assign_alert_to_incident(alert_id: int, assign_data: AlertAssignIncident):
+    db = get_db()
+
+    alert = (
+        db.query(AlertModel)
+        .filter(AlertModel.id == alert_id)
+        .first()
+    )
+
+    if alert is None:
+        db.close()
+        return {
+            "status": "error",
+            "message": "Alert not found"
+        }
+
+    incident = (
+        db.query(IncidentModel)
+        .filter(IncidentModel.id == assign_data.incident_id)
+        .first()
+    )
+
+    if incident is None:
+        db.close()
+        return {
+            "status": "error",
+            "message": "Incident not found"
+        }
+
+    alert.incident_id = assign_data.incident_id
+    db.commit()
+    db.refresh(alert)
+
+    response = {
+        "status": "success",
+        "message": "Alert assigned to incident successfully",
+        "alert": alert_to_dict(alert)
+    }
+
+    db.close()
+
+    return response
+

@@ -20,6 +20,7 @@ class AlertModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     rule_id = Column(String)
+    incident_id = Column(Integer, nullable=True)
     title = Column(String)
     description = Column(String)
     severity = Column(String)

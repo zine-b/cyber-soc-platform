@@ -16,6 +16,8 @@ class IncidentCreate(BaseModel):
     description: str
     severity: str
 
-
 class IncidentStatusUpdate(BaseModel):
     status: str
+
+class AlertAssignIncident(BaseModel):
+    incident_id: int
