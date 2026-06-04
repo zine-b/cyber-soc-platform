@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cyber-soc-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:///./data/cyber_soc.db
+      APP_NAME: Cyber SOC Platform API
+      APP_VERSION: 0.1.0
+      FRONTEND_URL: http://localhost:5173
+    volumes:
+      - backend_data:/app/data
+    networks:
+      - cyber-soc-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cyber-soc-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://127.0.0.1:8000
+    depends_on:
+      - backend
+    networks:
+      - cyber-soc-network
+
+volumes:
+  backend_data:
+
+networks:
+  cyber-soc-network:
+    driver: bridge
