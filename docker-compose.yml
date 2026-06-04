@@ -10,7 +10,7 @@ services:
       DATABASE_URL: sqlite:///./data/cyber_soc.db
       APP_NAME: Cyber SOC Platform API
       APP_VERSION: 0.1.0
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: http://34.68.124.140
     volumes:
       - backend_data:/app/data
     networks:
@@ -20,11 +20,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://34.68.124.140:8000
     container_name: cyber-soc-frontend
     ports:
-      - "5173:5173"
-    environment:
-      VITE_API_BASE_URL: http://127.0.0.1:8000
+      - "80:80"
     depends_on:
       - backend
     networks:
