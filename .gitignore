@@ -1,6 +1,18 @@
-venv/
-.env
+# Python
 __pycache__/
 *.pyc
+venv/
+.env
+*.db
+
+# Node
+node_modules/
+dist/
+.env
+
+# IDE
+.vscode/
 .idea/
-*.iml
+
+# OS
+.DS_Store

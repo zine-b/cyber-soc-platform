@@ -18,6 +18,12 @@ from .schemas import (
 from .parsers import parse_linux_auth_log
 from .detection import detect_brute_force
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 
 app = FastAPI(
     title="Cyber SOC Platform API",
@@ -28,7 +34,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
+        FRONTEND_URL,
         "http://127.0.0.1:5173"
     ],
     allow_credentials=True,

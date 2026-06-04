@@ -1,10 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-
+from dotenv import load_dotenv
+import os
 # -------------------------
 # Database configuration
 # -------------------------
-DATABASE_URL = "sqlite:///./cyber_soc.db"
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./cyber_soc.db")
 
 # l’objet qui gère la connexion entre app Python et la base de données
 engine = create_engine(
