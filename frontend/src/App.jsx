@@ -4,6 +4,10 @@ import "./index.css";
 
 function App() {
   const [logs, setLogs] = useState([]);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsLimit] = useState(10);
+  const [logsTotalPages, setLogsTotalPages] = useState(1);
+  const [logsTotal, setLogsTotal] = useState(0);
   const [alerts, setAlerts] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -12,11 +16,18 @@ function App() {
     try {
       setLoading(true);
 
-      const logsResponse = await apiClient.get("/logs");
+      const logsResponse = await apiClient.get("/logs", {
+        params: {
+          page: logsPage,
+          limit: logsLimit,
+        },
+      });
       const alertsResponse = await apiClient.get("/alerts");
       const incidentsResponse = await apiClient.get("/incidents");
 
       setLogs(logsResponse.data.logs || []);
+      setLogsTotalPages(logsResponse.data.total_pages || 1);
+      setLogsTotal(logsResponse.data.total || 0);
       setAlerts(alertsResponse.data.alerts || []);
       setIncidents(incidentsResponse.data.incidents || []);
     } catch (error) {
@@ -28,50 +39,55 @@ function App() {
   }
 
   async function sendTestLogs() {
-    const testLogs = [
-      {
-        source: "linux-server-01",
-        log_type: "linux_auth",
-        message: "Failed password for root from 185.10.20.30 port 52344 ssh2",
-      },
-      {
-        source: "linux-server-01",
-        log_type: "linux_auth",
-        message: "Failed password for admin from 185.10.20.30 port 52345 ssh2",
-      },
-      {
-        source: "linux-server-01",
-        log_type: "linux_auth",
-        message: "Failed password for test from 185.10.20.30 port 52346 ssh2",
-      },
-      {
-        source: "linux-server-01",
-        log_type: "linux_auth",
-        message: "Failed password for ubuntu from 185.10.20.30 port 52347 ssh2",
-      },
-      {
-        source: "linux-server-01",
-        log_type: "linux_auth",
-        message: "Failed password for postgres from 185.10.20.30 port 52348 ssh2",
-      },
-    ];
+  const testLogs = [
+    {
+      source: "linux-server-01",
+      log_type: "linux_auth",
+      message: "Failed password for root from 185.10.20.30 port 52344 ssh2",
+    },
+    {
+      source: "linux-server-01",
+      log_type: "linux_auth",
+      message: "Failed password for admin from 185.10.20.30 port 52345 ssh2",
+    },
+    {
+      source: "linux-server-01",
+      log_type: "linux_auth",
+      message: "Failed password for test from 185.10.20.30 port 52346 ssh2",
+    },
+    {
+      source: "linux-server-01",
+      log_type: "linux_auth",
+      message: "Failed password for ubuntu from 185.10.20.30 port 52347 ssh2",
+    },
+    {
+      source: "linux-server-01",
+      log_type: "linux_auth",
+      message: "Failed password for postgres from 185.10.20.30 port 52348 ssh2",
+    },
+  ];
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      for (const log of testLogs) {
-        await apiClient.post("/ingest/log", log);
-      }
-
-      await fetchData();
-      alert("Logs de test envoyés avec succès.");
-    } catch (error) {
-      console.error("Error sending test logs:", error);
-      alert("Erreur lors de l'envoi des logs de test.");
-    } finally {
-      setLoading(false);
+    for (const log of testLogs) {
+      await apiClient.post("/ingest/log", log);
     }
+
+    if (logsPage !== 1) {
+      setLogsPage(1);
+    } else {
+      await fetchData();
+    }
+
+    alert("Logs de test envoyés avec succès.");
+  } catch (error) {
+    console.error("Error sending test logs:", error);
+    alert("Erreur lors de l'envoi des logs de test.");
+  } finally {
+    setLoading(false);
   }
+}
 
   async function createIncident() {
     try {
@@ -148,8 +164,8 @@ function App() {
   }
 
   useEffect(() => {
-    fetchData();
-  }, []);
+  fetchData();
+}, [logsPage]);
 
   const openAlerts = alerts.filter((alert) => alert.status === "open");
   const highAlerts = alerts.filter((alert) => alert.severity === "high");
@@ -190,7 +206,7 @@ function App() {
         <section id="dashboard" className="cards">
           <div className="card">
             <span>Total logs</span>
-            <strong>{logs.length}</strong>
+            <strong>{logsTotal}</strong>
           </div>
 
           <div className="card">
@@ -223,10 +239,10 @@ function App() {
           <h2>Alertes</h2>
 
           {alerts.length === 0 ? (
-            <p>Aucune alerte pour le moment.</p>
+              <p>Aucune alerte pour le moment.</p>
           ) : (
-            <table>
-              <thead>
+              <table>
+                <thead>
                 <tr>
                   <th>ID</th>
                   <th>Titre</th>
@@ -236,36 +252,36 @@ function App() {
                   <th>Incident</th>
                   <th>Action</th>
                 </tr>
-              </thead>
+                </thead>
 
-              <tbody>
+                <tbody>
                 {alerts.map((alert) => (
-                  <tr key={alert.id}>
-                    <td>{alert.id}</td>
-                    <td>{alert.title}</td>
-                    <td>
+                    <tr key={alert.id}>
+                      <td>{alert.id}</td>
+                      <td>{alert.title}</td>
+                      <td>
                       <span className={`badge ${alert.severity}`}>
                         {alert.severity}
                       </span>
-                    </td>
-                    <td>{alert.source_ip}</td>
-                    <td>{alert.status}</td>
-                    <td>{alert.incident_id || "Non lié"}</td>
-                    <td>
-                      {incidents.length > 0 && !alert.incident_id && (
-                        <button
-                          onClick={() =>
-                            assignAlertToIncident(alert.id, incidents[0].id)
-                          }
-                        >
-                          Lier à incident #{incidents[0].id}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                      <td>{alert.source_ip}</td>
+                      <td>{alert.status}</td>
+                      <td>{alert.incident_id || "Non lié"}</td>
+                      <td>
+                        {incidents.length > 0 && !alert.incident_id && (
+                            <button
+                                onClick={() =>
+                                    assignAlertToIncident(alert.id, incidents[0].id)
+                                }
+                            >
+                              Lier à incident #{incidents[0].id}
+                            </button>
+                        )}
+                      </td>
+                    </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
           )}
         </section>
 
@@ -273,10 +289,10 @@ function App() {
           <h2>Incidents</h2>
 
           {incidents.length === 0 ? (
-            <p>Aucun incident pour le moment.</p>
+              <p>Aucun incident pour le moment.</p>
           ) : (
-            <table>
-              <thead>
+              <table>
+                <thead>
                 <tr>
                   <th>ID</th>
                   <th>Titre</th>
@@ -285,47 +301,47 @@ function App() {
                   <th>Assigné à</th>
                   <th>Actions</th>
                 </tr>
-              </thead>
+                </thead>
 
-              <tbody>
+                <tbody>
                 {incidents.map((incident) => (
-                  <tr key={incident.id}>
-                    <td>{incident.id}</td>
-                    <td>{incident.title}</td>
-                    <td>
+                    <tr key={incident.id}>
+                      <td>{incident.id}</td>
+                      <td>{incident.title}</td>
+                      <td>
                       <span className={`badge ${incident.severity}`}>
                         {incident.severity}
                       </span>
-                    </td>
-                    <td>{incident.status}</td>
-                    <td>{incident.assigned_to || "Non assigné"}</td>
-                    <td className="table-actions">
-                      {!incident.assigned_to && (
-                        <button onClick={() => assignIncident(incident.id)}>
-                          Assigner
+                      </td>
+                      <td>{incident.status}</td>
+                      <td>{incident.assigned_to || "Non assigné"}</td>
+                      <td className="table-actions">
+                        {!incident.assigned_to && (
+                            <button onClick={() => assignIncident(incident.id)}>
+                              Assigner
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() =>
+                                updateIncidentStatus(incident.id, "investigating")
+                            }
+                        >
+                          Investigating
                         </button>
-                      )}
 
-                      <button
-                        onClick={() =>
-                          updateIncidentStatus(incident.id, "investigating")
-                        }
-                      >
-                        Investigating
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          updateIncidentStatus(incident.id, "resolved")
-                        }
-                      >
-                        Resolved
-                      </button>
-                    </td>
-                  </tr>
+                        <button
+                            onClick={() =>
+                                updateIncidentStatus(incident.id, "resolved")
+                            }
+                        >
+                          Resolved
+                        </button>
+                      </td>
+                    </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
           )}
         </section>
 
@@ -333,35 +349,57 @@ function App() {
           <h2>Logs récents</h2>
 
           {logs.length === 0 ? (
-            <p>Aucun log pour le moment.</p>
+              <p>Aucun log pour le moment.</p>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Source</th>
-                  <th>Type</th>
-                  <th>Action</th>
-                  <th>Username</th>
-                  <th>IP source</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {logs.slice(0, 20).map((log) => (
-                  <tr key={log.id}>
-                    <td>{log.id}</td>
-                    <td>{log.source}</td>
-                    <td>{log.log_type}</td>
-                    <td>{log.parsed?.action || "-"}</td>
-                    <td>{log.parsed?.username || "-"}</td>
-                    <td>{log.parsed?.source_ip || "-"}</td>
-                    <td className="message">{log.message}</td>
+              <>
+                <table>
+                  <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Source</th>
+                    <th>Type</th>
+                    <th>Action</th>
+                    <th>Username</th>
+                    <th>IP source</th>
+                    <th>Message</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  </thead>
+
+                  <tbody>
+                  {logs.map((log) => (
+                      <tr key={log.id}>
+                        <td>{log.id}</td>
+                        <td>{log.source}</td>
+                        <td>{log.log_type}</td>
+                        <td>{log.parsed?.action || "-"}</td>
+                        <td>{log.parsed?.username || "-"}</td>
+                        <td>{log.parsed?.source_ip || "-"}</td>
+                        <td className="message">{log.message}</td>
+                      </tr>
+                  ))}
+                  </tbody>
+                </table>
+
+                <div className="pagination">
+                  <button
+                      onClick={() => setLogsPage((page) => page - 1)}
+                      disabled={logsPage === 1 || loading}
+                  >
+                    Précédent
+                  </button>
+
+                  <span>
+          Page {logsPage} sur {logsTotalPages} — {logsTotal} logs au total
+        </span>
+
+                  <button
+                      onClick={() => setLogsPage((page) => page + 1)}
+                      disabled={logsPage >= logsTotalPages || loading}
+                  >
+                    Suivant
+                  </button>
+                </div>
+              </>
           )}
         </section>
       </main>

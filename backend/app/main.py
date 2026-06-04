@@ -81,17 +81,35 @@ def ingest_log(log: LogInput):
     return response
 
 @app.get("/logs")
-def get_logs():
+def get_logs(page: int = 1, limit: int = 10):
     db = get_db()
+
+    if page < 1:
+        page = 1
+
+    if limit < 1:
+        limit = 10
+
+    if limit > 100:
+        limit = 100
+
+    offset = (page - 1) * limit
+    total_logs = db.query(LogModel).count()
 
     logs = (
         db.query(LogModel)
         .order_by(LogModel.id.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 
     response = {
         "count": len(logs),
+        "total": total_logs,
+        "page": page,
+        "limit": limit,
+        "total_pages": (total_logs + limit - 1) // limit,
         "logs": [LogResponse.model_validate(log) for log in logs]
     }
 

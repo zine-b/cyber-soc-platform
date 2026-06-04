@@ -244,3 +244,16 @@ td {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.pagination span {
+  color: #cbd5e1;
+  font-size: 14px;
+}
