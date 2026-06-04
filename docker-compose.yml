@@ -10,7 +10,7 @@ services:
       DATABASE_URL: sqlite:///./data/cyber_soc.db
       APP_NAME: Cyber SOC Platform API
       APP_VERSION: 0.1.0
-      FRONTEND_URL: http://34.68.124.140
+      FRONTEND_URL: http://cyber-soc.duckdns.org
     volumes:
       - backend_data:/app/data
     networks:
