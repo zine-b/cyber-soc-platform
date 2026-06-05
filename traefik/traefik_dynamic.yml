@@ -1,0 +1,69 @@
+#Navigateur
+#   ↓
+#Traefik HTTPS
+#   ├── /api        → backend:8000
+#   ├── /docs       → backend:8000
+#   ├── /openapi.json → backend:8000
+#   └── reste       → frontend:80
+
+http:
+  #rule        → condition
+  #entryPoints → port d’entrée
+  #tls         → HTTPS
+  #service     → destination
+  routers:
+    frontend:
+      rule: "Host(`cyber-soc.duckdns.org`)"
+      entryPoints:
+        #port HTTPS 443
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: frontend-service
+      priority: 1
+
+    api:
+      rule: "Host(`cyber-soc.duckdns.org`) && PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: backend-service
+      middlewares:
+        - strip-api-prefix
+      priority: 100
+
+    docs:
+      rule: "Host(`cyber-soc.duckdns.org`) && PathPrefix(`/docs`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: backend-service
+      priority: 100
+
+    openapi:
+      rule: "Host(`cyber-soc.duckdns.org`) && Path(`/openapi.json`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: backend-service
+      priority: 100
+
+  middlewares:
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api"
+
+  services:
+    frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
+
+    backend-service:
+      loadBalancer:
+        servers:
+          - url: "http://backend:8000"

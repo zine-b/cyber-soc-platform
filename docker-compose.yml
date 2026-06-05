@@ -1,4 +1,42 @@
 services:
+  traefik:
+    image: traefik:v3.0
+    container_name: cyber-soc-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+
+      # File provider: no Docker socket, no Docker API issue
+      - "--providers.file.filename=/etc/traefik/traefik_dynamic.yml"
+      - "--providers.file.watch=true"
+
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+
+      # Redirect HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+
+      # Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.email=zineb.marricha11@gmail.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - "./traefik/traefik_dynamic.yml:/etc/traefik/traefik_dynamic.yml:ro"
+      - "./traefik/acme.json:/letsencrypt/acme.json"
+
+    networks:
+      - cyber-soc-network
+
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -10,11 +48,12 @@ services:
       DATABASE_URL: sqlite:///./data/cyber_soc.db
       APP_NAME: Cyber SOC Platform API
       APP_VERSION: 0.1.0
-      FRONTEND_URL: http://cyber-soc.duckdns.org
+      FRONTEND_URL: https://cyber-soc.duckdns.org
     volumes:
       - backend_data:/app/data
     networks:
       - cyber-soc-network
+    restart: unless-stopped
 
   frontend:
     build:
@@ -23,12 +62,13 @@ services:
       args:
         VITE_API_BASE_URL: /api
     container_name: cyber-soc-frontend
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - backend
     networks:
       - cyber-soc-network
+    restart: unless-stopped
 
 volumes:
   backend_data:
