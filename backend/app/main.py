@@ -52,6 +52,12 @@ def home():
         "message": "Cyber SOC Platform API is running"
     }
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "backend"
+    }
 
 @app.post("/ingest/log")
 def ingest_log(log: LogInput):
