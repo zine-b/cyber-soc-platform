@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cyber-soc-postgres
+    environment:
+      POSTGRES_DB: cyber_soc
+      POSTGRES_USER: cyber_user
+      POSTGRES_PASSWORD: cyber_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cyber-soc-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U cyber_user -d cyber_soc" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   traefik:
     image: traefik:v3.0
     container_name: cyber-soc-traefik
@@ -45,12 +64,13 @@ services:
     expose:
       - "8000"
     environment:
-      DATABASE_URL: sqlite:///./data/cyber_soc.db
+      DATABASE_URL: postgresql://cyber_user:cyber_password@postgres:5432/cyber_soc
       APP_NAME: Cyber SOC Platform API
       APP_VERSION: 0.1.0
       FRONTEND_URL: https://cyber-soc.duckdns.org
-    volumes:
-      - backend_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - cyber-soc-network
     restart: unless-stopped
@@ -83,7 +103,7 @@ services:
       start_period: 10s
 
 volumes:
-  backend_data:
+  postgres_data:
 
 networks:
   cyber-soc-network:
