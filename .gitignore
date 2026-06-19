@@ -1,7 +1,13 @@
-# Python
+# Go
+backend/bin/
+coverage.out
+
+# Legacy local Python artifacts
 __pycache__/
 *.pyc
 venv/
+
+# Local environment and data
 .env
 *.db
 

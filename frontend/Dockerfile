@@ -16,7 +16,6 @@ COPY . .
 
 RUN npm run build
 
-
 # -------------------------
 # Production stage
 # -------------------------
